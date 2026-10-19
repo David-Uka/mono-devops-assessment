@@ -6,7 +6,7 @@ Simple TypeScript Node.js API exposing health, metrics and account endpoints.
 
 You have been provided with a simple web service that serves 4 endpoints, you are required to do the following;
 
-1. Add a DOCKERFILE in the repository to serve the service in containerized infra
+1. Add a DOCKERFILE in the repository
 2. Provision an EKS cluster on AWS with terraform (you can create a free tier account on AWS)
 3. Create a docker image and upload on AWS Elastic container registry using the same Terraform file
 4. Deploy the docker image from AWS ECR to the kubernetes cluster
