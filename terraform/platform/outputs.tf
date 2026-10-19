@@ -3,11 +3,11 @@ output "image" {
 }
 
 output "alb_hostname" {
-  value = try(data.kubernetes_ingress_v1.api.status[0].load_balancer[0].ingress[0].hostname, "")
+  value = data.aws_lb.api.dns_name
 }
 
 output "api_url" {
-  value = var.domain_name != "" ? "https://${var.domain_name}" : "http://${try(data.kubernetes_ingress_v1.api.status[0].load_balancer[0].ingress[0].hostname, "<pending>")}"
+  value = local.tls_enabled ? "https://${var.domain_name}" : "http://${data.aws_lb.api.dns_name}"
 }
 
 output "grafana_port_forward" {

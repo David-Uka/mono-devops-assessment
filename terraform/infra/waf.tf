@@ -8,6 +8,46 @@ resource "aws_wafv2_web_acl" "api" {
     allow {}
   }
 
+  # Belt and braces with the ALB fixed-response rule: this one is
+  # case-insensitive and path-normalised, so /Metrics and /metrics/ are caught.
+  rule {
+    name     = "block-metrics-path"
+    priority = 5
+    action {
+      block {
+        custom_response {
+          response_code = 403
+        }
+      }
+    }
+    statement {
+      byte_match_statement {
+        search_string         = "/metrics"
+        positional_constraint = "STARTS_WITH"
+        field_to_match {
+          uri_path {}
+        }
+        text_transformation {
+          priority = 0
+          type     = "URL_DECODE"
+        }
+        text_transformation {
+          priority = 1
+          type     = "NORMALIZE_PATH"
+        }
+        text_transformation {
+          priority = 2
+          type     = "LOWERCASE"
+        }
+      }
+    }
+    visibility_config {
+      cloudwatch_metrics_enabled = true
+      metric_name                = "block-metrics-path"
+      sampled_requests_enabled   = true
+    }
+  }
+
   rule {
     name     = "aws-common"
     priority = 10

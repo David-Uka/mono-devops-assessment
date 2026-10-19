@@ -29,11 +29,28 @@ module "eks" {
   enable_cluster_creator_admin_permissions = true
   enable_irsa                              = true
 
+  # Extra humans/roles who need cluster-admin besides whoever ran the apply
+  access_entries = {
+    for i, arn in var.additional_cluster_admin_arns : "admin-${i}" => {
+      principal_arn = arn
+      policy_associations = {
+        admin = {
+          policy_arn   = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
+          access_scope = { type = "cluster" }
+        }
+      }
+    }
+  }
+
   # Managed add-ons; versions resolved to the latest compatible with the cluster
   addons = {
-    coredns                = { most_recent = true }
-    kube-proxy             = { most_recent = true }
-    vpc-cni                = { most_recent = true, before_compute = true }
+    coredns    = { most_recent = true }
+    kube-proxy = { most_recent = true }
+    vpc-cni = {
+      most_recent          = true
+      before_compute       = true
+      configuration_values = jsonencode({ enableNetworkPolicy = "true" })
+    }
     eks-pod-identity-agent = { most_recent = true, before_compute = true }
     metrics-server         = { most_recent = true }
   }

@@ -3,7 +3,7 @@
 SHELL := /bin/bash
 REGION ?= us-east-1
 STATE_BUCKET ?= $(shell cd terraform/bootstrap 2>/dev/null && terraform output -raw state_bucket 2>/dev/null)
-IMAGE_TAG ?= $(shell git rev-parse --short=12 HEAD)
+IMAGE_TAG ?= $(shell git rev-parse --short=12 HEAD)-local-$(shell date +%s)
 GITHUB_REPO ?= $(shell gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null)
 
 .PHONY: help build run test bootstrap infra platform deploy destroy kubeconfig grafana

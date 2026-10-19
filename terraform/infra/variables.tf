@@ -62,6 +62,12 @@ variable "endpoint_public_access_cidrs" {
   default     = ["0.0.0.0/0"]
 }
 
+variable "additional_cluster_admin_arns" {
+  description = "IAM principal ARNs granted cluster-admin via access entries (e.g. your own user when CI created the cluster)"
+  type        = list(string)
+  default     = []
+}
+
 variable "waf_rate_limit_per_5min" {
   description = "Requests per source IP per 5 minutes before WAF starts blocking"
   type        = number

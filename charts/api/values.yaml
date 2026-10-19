@@ -76,8 +76,6 @@ podDisruptionBudget:
 
 networkPolicy:
   enabled: true
-  # namespaces allowed to scrape /metrics (label kubernetes.io/metadata.name)
-  monitoringNamespace: monitoring
 
 topologySpreadConstraints:
   enabled: true

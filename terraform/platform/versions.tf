@@ -18,6 +18,10 @@ terraform {
       source  = "kreuzwerker/docker"
       version = "~> 3.6"
     }
+    time = {
+      source  = "hashicorp/time"
+      version = "~> 0.13"
+    }
   }
 
   backend "s3" {

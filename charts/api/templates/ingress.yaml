@@ -25,8 +25,8 @@ spec:
         paths:
 {{- if $.Values.ingress.denyMetricsAtEdge }}
           # Handled by the ALB itself (fixed 403) via the actions.metrics-deny annotation
-          - path: /metrics
-            pathType: Exact
+          - path: /metrics*
+            pathType: ImplementationSpecific
             backend:
               service:
                 name: metrics-deny
@@ -46,8 +46,8 @@ spec:
         paths:
 {{- if $.Values.ingress.denyMetricsAtEdge }}
           # Handled by the ALB itself (fixed 403) via the actions.metrics-deny annotation
-          - path: /metrics
-            pathType: Exact
+          - path: /metrics*
+            pathType: ImplementationSpecific
             backend:
               service:
                 name: metrics-deny

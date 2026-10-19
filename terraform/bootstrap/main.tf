@@ -203,7 +203,7 @@ data "aws_iam_policy_document" "gha_deploy_iam" {
     condition {
       test     = "StringEquals"
       variable = "iam:PassedToService"
-      values   = ["eks.amazonaws.com", "ec2.amazonaws.com", "pods.eks.amazonaws.com"]
+      values   = ["eks.amazonaws.com", "ec2.amazonaws.com", "pods.eks.amazonaws.com", "vpc-flow-logs.amazonaws.com"]
     }
   }
   statement {

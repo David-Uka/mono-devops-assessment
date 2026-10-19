@@ -151,9 +151,13 @@ instead of `docker/build-push-action`. Requirement 3 asks for that, and it has
 an upside I like: the image, its tag and the Helm release sit in one state, so
 a plan shows exactly which image a rollout will ship. The cost is that the
 build runs wherever `terraform apply` runs, so the runner needs Docker
-(GitHub's hosted runners have it), and a tag change rebuilds the image even
-when the layers are cached. I looked at `null_resource` with `local-exec` and
-dropped it because it gives you no diff and no drift detection.
+(GitHub's hosted runners have it), the Dockerfile has to stay within what the
+classic builder supports, and a tag change rebuilds the image even when the
+layers are cached. ECR tags are immutable, so the tag is
+`<short sha>-<run id>-<attempt>`: a re-run of the same commit gets a fresh tag
+instead of failing on push, and the sha is still in the name. I looked at
+`null_resource` with `local-exec` and dropped it because it gives you no diff
+and no drift detection.
 
 A Helm chart rather than raw manifests, with values injected by Terraform, so
 the workload has one definition. The chart is strict on purpose:
@@ -188,14 +192,18 @@ defaults to open so the assessment is reproducible. In a real account it would
 be the office or VPN CIDR plus the CI runner egress, or private only with a
 bastion.
 
-`/metrics` is blocked at the ALB rather than in the app. I would rather the
+`/metrics` is blocked at the edge rather than in the app. I would rather the
 app behave the same in every environment than carry an `if (!internal)`
-branch, and the fixed-response rule is declarative and shows up in the plan.
-Prometheus scrapes the pod directly inside the VPC and never crosses the ALB.
+branch. Two layers do the blocking: a WAF rule that lowercases and normalises
+the path and rejects anything starting with `/metrics` (so `/Metrics` and
+`/metrics/` are caught too), and an ALB fixed-response rule on `/metrics*` as
+a backstop. The deploy smoke test checks four spellings. Prometheus scrapes
+the pod directly inside the VPC and never crosses the ALB.
 
 Cluster authentication uses access entries (`authentication_mode = "API"`)
 instead of the legacy `aws-auth` ConfigMap, so every grant of cluster access
-is an IAM-auditable API call.
+is an IAM-auditable API call. Whoever runs the first apply becomes admin; when
+that is CI, `additional_cluster_admin_arns` adds the humans who need kubectl.
 
 kube-prometheus-stack rather than Grafana Alloy with Amazon Managed
 Prometheus. One Helm release gives me Prometheus, Grafana, the operator and
@@ -225,7 +233,14 @@ Kubernetes:
   series per scanner request (the original would have let anyone blow up
   Prometheus cardinality by walking random URLs).
 * `src/middleware/request-metrics.middleware.ts`: times each request with
-  `process.hrtime.bigint()`.
+  `process.hrtime.bigint()` and records on the response's `close` event, so a
+  client that disconnects mid-response still decrements the in-flight gauge
+  (labelled `499`, nginx-style).
+* `package.json`: an `overrides` entry pins `multer` to 2.x. routing-controllers
+  only loads it for upload decorators this API does not use, and the 1.x line
+  carried ten HIGH CVEs that Trivy would otherwise fail the build on. The
+  runtime image also deletes npm itself, which drops its bundled `undici` and
+  `brace-expansion` from the scan.
 
 Observed, not changed: all three dummy accounts share the same `id`, so
 `/getAccount?id=` can only ever return the first one. That is business data,
@@ -235,11 +250,11 @@ not infrastructure, so I left it and am flagging it.
 
 | Concern | Implementation |
 |---|---|
-| Least-privilege IAM | No long-lived keys anywhere. GitHub → AWS via OIDC with branch-scoped trust. Deploy role's IAM rights are limited to `mono-api-*` resources and `PassRole` only to EKS/EC2/Pod Identity. ALB controller uses IRSA with the vendor policy only. Pods run with `automountServiceAccountToken: false`. Nodes use IMDSv2 with hop limit 1 so a pod cannot reach the node's instance role. |
+| Least-privilege IAM | No long-lived keys anywhere. GitHub to AWS via OIDC with branch-scoped trust. Deploy role's IAM rights are limited to `mono-api-*` resources and `PassRole` only to EKS/EC2/Pod Identity. ALB controller uses IRSA with the vendor policy only. Pods run with `automountServiceAccountToken: false`. Nodes use IMDSv2 with hop limit 1 so a pod cannot reach the node's instance role. |
 | Secrets | Kubernetes Secrets are envelope-encrypted with a customer-managed KMS key (rotation on). The app has no secrets today; when it does, the path is External Secrets Operator + Secrets Manager via IRSA, never values in `values.yaml`. Grafana admin password is a GitHub secret passed as a sensitive Terraform variable. |
-| Encryption in transit | TLS 1.2/1.3 at the ALB (`ELBSecurityPolicy-TLS13-1-2-2021-06`) with HTTP→HTTPS redirect when a domain is set. ALB→pod is plain HTTP inside the VPC on private subnets; a service mesh (mTLS) is in the gaps. State bucket enforces TLS-only access. |
+| Encryption in transit | TLS 1.2/1.3 at the ALB (`ELBSecurityPolicy-TLS13-1-2-2021-06`) with HTTP to HTTPS redirect when a domain is set. ALB to pod is plain HTTP inside the VPC on private subnets; a service mesh (mTLS) is in the gaps. State bucket enforces TLS-only access. |
 | Encryption at rest | KMS CMK for EKS secrets, ECR images and node EBS root volumes. S3 state bucket SSE-KMS; ALB logs SSE-S3 (the only mode ALB delivery supports). |
-| Network | Nodes in private subnets, no public IPs. Node SG only accepts the app port from inside the VPC. `NetworkPolicy` restricts pod ingress to the app port and egress to DNS. Namespace enforces Pod Security Admission `restricted`. |
+| Network | Nodes in private subnets, no public IPs. Node SG only accepts the app port from inside the VPC. `NetworkPolicy` restricts pod ingress to the app port and egress to DNS, enforced by the VPC CNI network policy agent (`enableNetworkPolicy`), which is off by default on EKS. Namespace enforces Pod Security Admission `restricted`. |
 | Edge protection | WAF: AWS Common, Known Bad Inputs, IP Reputation managed rule groups, plus a 2000 req/5 min per-IP rate limit. ALB drops invalid headers. Only GET is implemented; everything else is 405. |
 | Supply chain | Immutable ECR tags, scan-on-push, image tag = git sha, Trivy gate in CI (fails on fixable HIGH/CRITICAL), `npm ci` from the lockfile, pinned action/provider/module versions. |
 | Audit logging | EKS control-plane logs (`api`, `audit`, `authenticator`, `controllerManager`, `scheduler`) to CloudWatch, 30-day retention. VPC flow logs. ALB access logs to S3 with 90-day lifecycle. WAF sampled requests + CloudWatch metrics. Terraform state is versioned, so every infrastructure change has a before/after. |
@@ -298,17 +313,19 @@ In the order I would tackle them.
    read-only API, but `/getAccount` returns account numbers. Real production
    needs OAuth2/JWT at the ALB (Cognito or OIDC action) or in the app, and
    a WAF rule that rejects requests without an `Authorization` header.
-2. A real domain and TLS. The code paths exist (`domain_name` +
-   `route53_zone_id` → ACM → HTTPS listener with redirect); without a domain
-   the live URL is plain HTTP on the ALB hostname. Add HSTS once on HTTPS.
+2. A real domain and TLS. The code path exists: `domain_name` plus
+   `route53_zone_id` gives an ACM certificate, an HTTPS listener with redirect
+   and a Route53 alias to the ALB. I had no domain to hand for this submission,
+   so that path is validated but not exercised, and the live URL is plain HTTP
+   on the ALB hostname. Add HSTS once on HTTPS.
 3. Separate staging environment. Same modules, a second `tfvars` and state
    key, and the `prod` deploy job gated on a staging smoke test.
 4. Alerting. Prometheus rules for error rate > 1%, p95 > 500 ms, pods
-   unavailable; Alertmanager → PagerDuty/Slack. Currently the dashboard shows
+   unavailable; Alertmanager to PagerDuty or Slack. Currently the dashboard shows
    the problem but nobody is paged.
 5. Managed, durable observability. Prometheus here has 7-day retention on
    an EBS volume; move to Amazon Managed Prometheus + Grafana (or Grafana
-   Cloud) and ship logs (Fluent Bit → CloudWatch/OpenSearch). Add
+   Cloud) and ship logs (Fluent Bit to CloudWatch or OpenSearch). Add
    OpenTelemetry tracing when there is more than one service.
 6. Cluster autoscaling. The HPA scales pods, nothing scales nodes. Karpenter
    with a `NodePool` and `expireAfter` for continuous rotation.

@@ -43,6 +43,8 @@ jobs:
           terraform destroy -input=false -auto-approve
         env:
           TF_VAR_image_tag: destroy
+          TF_VAR_domain_name: ${{ vars.API_DOMAIN_NAME }}
+          TF_VAR_route53_zone_id: ${{ vars.ROUTE53_ZONE_ID }}
       - name: Destroy infra
         working-directory: terraform/infra
         run: |

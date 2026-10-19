@@ -12,9 +12,12 @@ export class RequestMetricsMiddleware implements ExpressMiddlewareInterface {
     const startedAt = process.hrtime.bigint();
     this.metrics.requestStarted();
 
-    res.on("finish", () => {
+    // "close" fires whether the response finished or the client went away,
+    // so the in-flight gauge cannot drift. Aborted requests are labelled 499.
+    res.once("close", () => {
       const elapsedSeconds = Number(process.hrtime.bigint() - startedAt) / 1e9;
-      this.metrics.requestFinished(req.method ?? "UNKNOWN", req.path, res.statusCode, elapsedSeconds);
+      const status = res.writableFinished ? res.statusCode : 499;
+      this.metrics.requestFinished(req.method ?? "UNKNOWN", req.path, status, elapsedSeconds);
     });
     next();
   }

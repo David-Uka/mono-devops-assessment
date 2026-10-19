@@ -21,6 +21,11 @@ module "vpc" {
   create_flow_log_cloudwatch_log_group            = true
   flow_log_max_aggregation_interval               = 60
   flow_log_cloudwatch_log_group_retention_in_days = 30
+  # Names must fall inside the deploy role's mono-api-* IAM scope
+  vpc_flow_log_iam_role_name              = "${local.name}-flow-log"
+  vpc_flow_log_iam_role_use_name_prefix   = false
+  vpc_flow_log_iam_policy_name            = "${local.name}-flow-log"
+  vpc_flow_log_iam_policy_use_name_prefix = false
 
   # Subnet discovery tags for the AWS Load Balancer Controller
   public_subnet_tags = {

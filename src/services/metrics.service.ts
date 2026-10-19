@@ -58,11 +58,6 @@ export class MetricsService {
     this.httpRequestDuration.labels(method, route, status).observe(durationSeconds);
   }
 
-  /** @deprecated kept for backwards compatibility; prefer requestFinished */
-  countRequest(method: string, route: string, statusCode: number): void {
-    this.httpRequestsTotal.labels(method, normalizeRoute(route), String(statusCode)).inc();
-  }
-
   async render(): Promise<string> {
     return this.register.metrics();
   }

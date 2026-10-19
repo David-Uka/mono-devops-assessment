@@ -2,8 +2,7 @@ name: CI
 
 on:
   pull_request:
-  push:
-    branches-ignore: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -95,7 +94,10 @@ jobs:
           terraform_version: "1.16.1"
       - run: terraform init -input=false -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}"
       - id: plan
-        run: terraform plan -no-color -input=false -lock=false -out=tfplan 2>&1 | tail -80 > plan.txt; cat plan.txt
+        shell: bash
+        run: |
+          set -o pipefail
+          terraform plan -no-color -input=false -lock=false -out=tfplan 2>&1 | tee plan.full | tail -80 > plan.txt
       - name: Comment plan on PR
         uses: actions/github-script@v7
         with:

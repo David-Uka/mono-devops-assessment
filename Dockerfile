@@ -1,11 +1,10 @@
-# syntax=docker/dockerfile:1.7
 # ---------------------------------------------------------------------------
 # Stage 1: build  - compile TypeScript with the full dependency set
 # ---------------------------------------------------------------------------
 FROM node:24-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN --mount=type=cache,target=/root/.npm npm ci --no-audit --no-fund
+RUN npm ci --no-audit --no-fund
 COPY tsconfig.json ./
 COPY src ./src
 RUN npm run build
@@ -16,7 +15,7 @@ RUN npm run build
 FROM node:24-alpine AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN --mount=type=cache,target=/root/.npm npm ci --omit=dev --no-audit --no-fund \
+RUN npm ci --omit=dev --no-audit --no-fund \
     && npm cache clean --force
 
 # ---------------------------------------------------------------------------

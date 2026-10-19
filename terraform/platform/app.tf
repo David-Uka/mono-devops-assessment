@@ -5,6 +5,9 @@ resource "kubernetes_namespace_v1" "app" {
       # Pod Security Admission: nothing privileged gets in
       "pod-security.kubernetes.io/enforce" = "restricted"
       "pod-security.kubernetes.io/warn"    = "restricted"
+      # ALB controller injects a readiness gate so a pod only counts as Ready
+      # once its target is healthy in the target group (zero-downtime rollouts)
+      "elbv2.k8s.aws/pod-readiness-gate-inject" = "enabled"
     }
   }
 }
@@ -74,9 +77,6 @@ resource "helm_release" "api" {
         labels  = { release = "kube-prometheus-stack" }
       }
     }
-    networkPolicy = {
-      monitoringNamespace = var.monitoring_namespace
-    }
   })]
 
   wait    = true
@@ -89,11 +89,30 @@ resource "helm_release" "api" {
   ]
 }
 
-# Resolve the ALB hostname the controller provisioned, for the smoke test.
-data "kubernetes_ingress_v1" "api" {
-  metadata {
-    name      = "api"
-    namespace = kubernetes_namespace_v1.app.metadata[0].name
+# The controller creates the ALB asynchronously after the Ingress exists.
+# Give it a moment before anything reads the load balancer back.
+resource "time_sleep" "alb_provisioning" {
+  create_duration = "90s"
+  depends_on      = [helm_release.api]
+}
+
+data "aws_lb" "api" {
+  tags = {
+    "elbv2.k8s.aws/cluster" = local.cluster_name
+    "ingress.k8s.aws/stack" = local.cluster_name
   }
-  depends_on = [helm_release.api]
+  depends_on = [time_sleep.alb_provisioning]
+}
+
+# With a domain, point it at the ALB. Without one the ALB DNS name is the URL.
+resource "aws_route53_record" "api" {
+  count   = local.tls_enabled ? 1 : 0
+  zone_id = var.route53_zone_id
+  name    = var.domain_name
+  type    = "A"
+  alias {
+    name                   = data.aws_lb.api.dns_name
+    zone_id                = data.aws_lb.api.zone_id
+    evaluate_target_health = true
+  }
 }

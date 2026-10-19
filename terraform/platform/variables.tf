@@ -46,6 +46,12 @@ variable "domain_name" {
   default     = ""
 }
 
+variable "route53_zone_id" {
+  description = "Hosted zone for domain_name (infra uses the same one for ACM validation)"
+  type        = string
+  default     = ""
+}
+
 variable "acm_certificate_arn" {
   description = "Certificate for the ALB listener when domain_name is set (infra output)"
   type        = string

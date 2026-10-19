@@ -73,11 +73,16 @@ jobs:
       - uses: azure/setup-helm@v4
       - uses: docker/setup-buildx-action@v3
       - run: terraform init -input=false -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}"
+      # ECR tags are immutable, so a re-run of the same commit must not try to
+      # overwrite: the tag carries the commit plus the run that built it.
+      - id: tag
+        run: echo "image_tag=${GITHUB_SHA::12}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_OUTPUT"
       - name: Terraform apply (docker build + ECR push + helm releases)
         run: terraform apply -input=false -auto-approve
         env:
-          TF_VAR_image_tag: ${{ github.sha }}
+          TF_VAR_image_tag: ${{ steps.tag.outputs.image_tag }}
           TF_VAR_domain_name: ${{ vars.API_DOMAIN_NAME }}
+          TF_VAR_route53_zone_id: ${{ vars.ROUTE53_ZONE_ID }}
           TF_VAR_acm_certificate_arn: ${{ needs.infra.outputs.acm_certificate_arn }}
           TF_VAR_grafana_admin_password: ${{ secrets.GRAFANA_ADMIN_PASSWORD }}
       - name: Smoke test the live URL
@@ -90,11 +95,13 @@ jobs:
           done
           [ -n "$ok" ] || { echo "ALB never became healthy"; exit 1; }
           echo; curl -fs "$URL/getAccount?id=66ab443c4d4ac0b1cdf456911"; echo
-          code=$(curl -s -o /dev/null -w '%{http_code}' "$URL/metrics")
-          [ "$code" = "403" ] || { echo "/metrics must be blocked at the edge, got $code"; exit 1; }
-          echo "/metrics correctly blocked (403)"
+          for p in /metrics /Metrics /metrics/ /METRICS; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' "$URL$p")
+            [ "$code" = "403" ] || { echo "$p must be blocked at the edge, got $code"; exit 1; }
+          done
+          echo "/metrics correctly blocked (403) in every spelling"
       - name: Verify the rollout is on this commit
         run: |
           aws eks update-kubeconfig --name "${{ needs.infra.outputs.cluster_name }}" --region "$AWS_REGION"
           kubectl -n api rollout status deploy/api --timeout=180s
-          kubectl -n api get deploy api -o jsonpath='{.spec.template.spec.containers[0].image}' | grep -q "${{ github.sha }}"
+          kubectl -n api get deploy api -o jsonpath='{.spec.template.spec.containers[0].image}' | grep -q "${{ steps.tag.outputs.image_tag }}"
