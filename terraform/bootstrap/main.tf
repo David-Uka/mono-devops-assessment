@@ -100,8 +100,13 @@ locals {
     ? "repo:${local.repo_owner}@${var.github_owner_id}/${local.repo_name}@${var.github_repo_id}"
     : "",
   ])
-  oidc_sub_main = [for p in local.sub_prefixes : "${p}:ref:refs/heads/${var.default_branch}"]
-  oidc_sub_pr   = [for p in local.sub_prefixes : "${p}:pull_request"]
+  # A job that targets a GitHub environment gets `environment:<name>` as its
+  # subject instead of the branch ref, so the deploy role must trust both.
+  oidc_sub_main = concat(
+    [for p in local.sub_prefixes : "${p}:ref:refs/heads/${var.default_branch}"],
+    [for p in local.sub_prefixes : "${p}:environment:${var.deploy_environment}"],
+  )
+  oidc_sub_pr = [for p in local.sub_prefixes : "${p}:pull_request"]
 }
 
 # Role used by `terraform plan` on pull requests: read-only plus state access.
@@ -125,7 +130,8 @@ data "aws_iam_policy_document" "gha_plan_trust" {
   }
 }
 
-# Role used by `terraform apply` - ONLY from the default branch.
+# Role used by `terraform apply` - ONLY from the default branch / prod environment.
+# The `prod` environment itself is restricted to the default branch in GitHub.
 data "aws_iam_policy_document" "gha_deploy_trust" {
   statement {
     actions = ["sts:AssumeRoleWithWebIdentity"]
