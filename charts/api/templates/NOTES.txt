@@ -1,0 +1,3 @@
+{{ include "api.fullname" . }} deployed to namespace {{ .Release.Namespace }}.
+Image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+Quick check:  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "api.fullname" . }} 8080:{{ .Values.service.port }} && curl localhost:8080/health

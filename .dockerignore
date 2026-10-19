@@ -1,0 +1,12 @@
+node_modules
+dist
+.git
+.github
+.env
+*.log
+*.md
+terraform
+charts
+dashboards
+docs
+.DS_Store

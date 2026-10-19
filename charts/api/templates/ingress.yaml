@@ -1,0 +1,65 @@
+{{- if .Values.ingress.enabled -}}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "api.fullname" . }}
+  labels:
+    {{- include "api.labels" . | nindent 4 }}
+  {{- with .Values.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  {{- with .Values.ingress.tls }}
+  tls:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  rules:
+    {{- $svc := include "api.fullname" . -}}
+    {{- $port := .Values.service.port -}}
+    {{- if .Values.ingress.hosts }}
+    {{- range .Values.ingress.hosts }}
+    - host: {{ . | quote }}
+      http:
+        paths:
+{{- if $.Values.ingress.denyMetricsAtEdge }}
+          # Handled by the ALB itself (fixed 403) via the actions.metrics-deny annotation
+          - path: /metrics*
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: metrics-deny
+                port:
+                  name: use-annotation
+          {{- end }}
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $svc }}
+                port:
+                  number: {{ $port }}
+    {{- end }}
+    {{- else }}
+    - http:
+        paths:
+{{- if $.Values.ingress.denyMetricsAtEdge }}
+          # Handled by the ALB itself (fixed 403) via the actions.metrics-deny annotation
+          - path: /metrics*
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: metrics-deny
+                port:
+                  name: use-annotation
+          {{- end }}
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $svc }}
+                port:
+                  number: {{ $port }}
+    {{- end }}
+{{- end }}

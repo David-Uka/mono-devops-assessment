@@ -1,0 +1,102 @@
+# Default values for the api chart. Production overrides live in Terraform.
+replicaCount: 2
+
+image:
+  repository: ""          # <account>.dkr.ecr.<region>.amazonaws.com/mono/api
+  tag: ""                 # git sha, injected by CI/Terraform
+  pullPolicy: IfNotPresent
+
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}         # e.g. eks.amazonaws.com/role-arn for IRSA
+  name: ""
+
+podAnnotations: {}
+podLabels: {}
+
+# Hardened by default: no root, no privilege escalation, read-only root fs.
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 3000
+
+ingress:
+  enabled: false
+  className: alb
+  annotations: {}
+  hosts: []               # list of hostnames; empty => ALB default DNS
+  tls: []
+  # Adds an ALB fixed-response rule so /metrics returns 403 from the edge.
+  # Requires the alb.ingress.kubernetes.io/actions.metrics-deny annotation.
+  denyMetricsAtEdge: false
+
+# The /metrics endpoint is scraped in-cluster and must NOT be reachable from
+# the internet. When ingress.blockMetrics is true the ALB returns 403 for it.
+metrics:
+  enabled: true
+  path: /metrics
+  serviceMonitor:
+    enabled: false
+    interval: 15s
+    labels: {}
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    memory: 256Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 6
+  targetCPUUtilizationPercentage: 70
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+networkPolicy:
+  enabled: true
+
+topologySpreadConstraints:
+  enabled: true
+
+livenessProbe:
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 5
+  periodSeconds: 10
+readinessProbe:
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 3
+  periodSeconds: 5
+
+# Seconds the pod gets after SIGTERM; must exceed the app's SHUTDOWN_TIMEOUT_MS
+terminationGracePeriodSeconds: 30
+
+env: []
+nodeSelector: {}
+tolerations: []
+affinity: {}
