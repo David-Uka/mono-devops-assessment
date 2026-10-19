@@ -6,7 +6,7 @@ EKS does not allow skipping minors on the control plane.
 
 ## Why the app survives an upgrade at all
 
-The guarantees come from the chart, not from the upgrade procedure:
+The chart is what makes this safe; the procedure below only sequences it:
 
 | Mechanism | Where | Effect during a node drain |
 |---|---|---|
@@ -16,18 +16,18 @@ The guarantees come from the chart, not from the upgrade procedure:
 | readiness probe + ALB `target-type: ip` | chart + ingress annotations | ALB only routes to ready pods; deregistration delay drains in-flight requests |
 | `preStop: sleep 5` + SIGTERM handler | deployment + `src/server.ts` | the pod finishes in-flight requests after it is removed from the target group |
 
-With those in place a drain is just a slow rolling restart.
+With those in place, a drain is a slow rolling restart and nothing more.
 
 ## Pre-flight (day before)
 
-1. **Read the release notes** for 1.37 and run Pluto against the cluster and the
+1. Read the release notes for 1.37 and run Pluto against the cluster and the
    chart to catch removed APIs:
    ```bash
    pluto detect-helm --target-versions k8s=v1.37.0
    kubectl get --raw /metrics | grep apiserver_requested_deprecated_apis
    aws eks list-insights --cluster-name mono-api-prod   # EKS upgrade insights
    ```
-2. **Check add-on compatibility** for the target version and review what
+2. Check add-on compatibility for the target version and review what
    `most_recent = true` in `terraform/infra/eks.tf` will resolve to:
    ```bash
    for a in vpc-cni coredns kube-proxy eks-pod-identity-agent metrics-server; do
@@ -35,13 +35,14 @@ With those in place a drain is just a slow rolling restart.
        --query 'addons[0].addonVersions[0].addonVersion' --output text
    done
    ```
-3. **Check the ALB controller and kube-prometheus-stack** support matrices for 1.37
+3. Check the ALB controller and kube-prometheus-stack support matrices for 1.37
    and bump `alb_controller_chart_version` / `kube_prometheus_stack_version` first
    if required (they roll independently of the cluster).
-4. **Confirm every PDB is satisfiable**: `kubectl get pdb -A` must show
-   `ALLOWED DISRUPTIONS >= 1`. A budget at 0 blocks the drain forever (I have hit
-   this before on a single-node cluster with coredns's own PDB).
-5. **Capacity headroom**: node group `max_size` must be at least
+4. Confirm every PDB is satisfiable: `kubectl get pdb -A` must show
+   `ALLOWED DISRUPTIONS >= 1`. A budget at 0 blocks the drain forever. I hit
+   this last month on a single-node cluster, where coredns's own PDB kept a
+   node group stuck in DELETING until I deleted the budget.
+5. Capacity headroom: node group `max_size` must be at least
    `desired_size + 1` so a surge node can be added during the rollout.
 6. Take a Velero backup of the `api` and `monitoring` namespaces (see
    SOLUTION.md, Backup and recovery) and note the Terraform state object version.
@@ -92,8 +93,8 @@ watch 'curl -s -o /dev/null -w "%{http_code}\n" https://<api>/health'
 ```
 
 The Grafana RED dashboard should show a flat request rate and no 5xx for the
-whole window. An error spike is the signal to pause: interrupt the apply and
-EKS finishes the node it is on and stops.
+whole window. If errors spike, interrupt the apply; EKS finishes the node it
+is on and stops.
 
 ### Step 4: verify
 
@@ -106,13 +107,13 @@ kubectl get pdb -A                  # disruptions allowed again
 
 ## Rollback
 
-* **Control plane**: EKS cannot downgrade. Rollback means fixing forward, which
+* Control plane: EKS cannot downgrade. Rollback means fixing forward, which
   is why the deprecated-API scan in pre-flight is mandatory.
-* **Node group**: if the new AMI misbehaves, pin `ami_release_version` in the
+* Node group: if the new AMI misbehaves, pin `ami_release_version` in the
   node group to the previous release and apply. EKS rolls the nodes back the
   same way it rolled them forward, PDB-safe.
-* **Add-ons**: pin the previous `addon_version` for the misbehaving add-on and apply.
-* **App**: unaffected by the cluster version; the last known-good image tag is
+* Add-ons: pin the previous `addon_version` for the misbehaving add-on and apply.
+* App: unaffected by the cluster version; the last known-good image tag is
   in ECR and `terraform apply -var image_tag=<sha>` redeploys it.
 
 ## Making it boring (what I would add next)
