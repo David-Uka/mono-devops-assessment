@@ -4,9 +4,9 @@ This is the runbook for moving the `mono-api-prod` cluster one minor version
 forward without dropping a request. The same steps apply to any N -> N+1 move;
 EKS does not allow skipping minors on the control plane.
 
-## Why the app survives an upgrade at all
+## What makes a drain safe
 
-The chart is what makes this safe; the procedure below only sequences it:
+The chart carries the protections; the procedure below sequences them.
 
 | Mechanism | Where | Effect during a node drain |
 |---|---|---|
@@ -16,7 +16,7 @@ The chart is what makes this safe; the procedure below only sequences it:
 | readiness probe + ALB `target-type: ip` | chart + ingress annotations | ALB only routes to ready pods; deregistration delay drains in-flight requests |
 | `preStop: sleep 5` + SIGTERM handler | deployment + `src/server.ts` | the pod finishes in-flight requests after it is removed from the target group |
 
-With those in place, a drain is a slow rolling restart and nothing more.
+With those in place a drain is a slow rolling restart.
 
 ## Pre-flight (day before)
 
@@ -116,7 +116,7 @@ kubectl get pdb -A                  # disruptions allowed again
 * App: unaffected by the cluster version; the last known-good image tag is
   in ECR and `terraform apply -var image_tag=<sha>` redeploys it.
 
-## Making it boring (what I would add next)
+## Next steps
 
 * Run the whole thing against a `staging` cluster first with the same Terraform
   (one more `tfvars` file).
