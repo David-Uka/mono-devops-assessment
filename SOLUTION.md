@@ -101,8 +101,9 @@ and the trust policy accepts both that and the plain `repo:owner/name` form.
 Then in the GitHub repo set **variables** `AWS_DEPLOY_ROLE_ARN`,
 `AWS_PLAN_ROLE_ARN`, `TF_STATE_BUCKET` (from the outputs) and optionally
 `API_DOMAIN_NAME`, `ROUTE53_ZONE_ID`, `CLUSTER_ADMIN_ARNS` (a JSON list of
-IAM ARNs that should get `kubectl` access, since CI creates the cluster); and
-the **secret** `GRAFANA_ADMIN_PASSWORD`. Create a `prod` environment (optionally with a
+IAM ARNs that should get `kubectl` access, since CI creates the cluster). The
+secret `GRAFANA_ADMIN_PASSWORD` is optional: without it the chart generates a
+random admin password, which `make grafana` prints from the cluster secret. Create a `prod` environment (optionally with a
 required reviewer, which turns `deploy.yml` into a one-click approval gate).
 
 ### Deploy from scratch
@@ -370,5 +371,5 @@ and the deploy workflow prints it on every run. If the environment has been
 torn down to save cost by the time you read this, `make deploy` brings it back
 in about 25 minutes with a new hostname.
 
-Grafana is not exposed. `make grafana` port-forwards it to
-http://localhost:3001; the dashboard is "Mono API - RED".
+Grafana is not exposed. `make grafana` prints the admin password and
+port-forwards it to http://localhost:3001; the dashboard is "Mono API - RED".

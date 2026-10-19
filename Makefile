@@ -41,5 +41,6 @@ destroy: ## tear down (platform first so the ALB is released before the VPC)
 kubeconfig: ## point kubectl at the cluster
 	aws eks update-kubeconfig --region $(REGION) --name mono-api-prod
 
-grafana: ## open Grafana on localhost:3001 (admin / see tfvars)
+grafana: ## port-forward Grafana to localhost:3001 and print the admin password
+	@echo "admin password: $$(kubectl -n monitoring get secret kube-prometheus-stack-grafana -o jsonpath='{.data.admin-password}' | base64 -d)"
 	kubectl -n monitoring port-forward svc/kube-prometheus-stack-grafana 3001:80
