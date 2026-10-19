@@ -5,7 +5,11 @@ resource "kubernetes_namespace_v1" "monitoring" {
   metadata {
     name = var.monitoring_namespace
     labels = {
-      "pod-security.kubernetes.io/enforce" = "baseline"
+      # node-exporter needs hostNetwork, hostPID and hostPath to read node
+      # metrics, which "baseline" forbids. Warn instead of enforce here; the
+      # application namespace stays at "restricted".
+      "pod-security.kubernetes.io/enforce" = "privileged"
+      "pod-security.kubernetes.io/warn"    = "baseline"
     }
   }
 }

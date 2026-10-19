@@ -100,8 +100,9 @@ and the trust policy accepts both that and the plain `repo:owner/name` form.
 
 Then in the GitHub repo set **variables** `AWS_DEPLOY_ROLE_ARN`,
 `AWS_PLAN_ROLE_ARN`, `TF_STATE_BUCKET` (from the outputs) and optionally
-`API_DOMAIN_NAME`, `ROUTE53_ZONE_ID`; and the **secret**
-`GRAFANA_ADMIN_PASSWORD`. Create a `prod` environment (optionally with a
+`API_DOMAIN_NAME`, `ROUTE53_ZONE_ID`, `CLUSTER_ADMIN_ARNS` (a JSON list of
+IAM ARNs that should get `kubectl` access, since CI creates the cluster); and
+the **secret** `GRAFANA_ADMIN_PASSWORD`. Create a `prod` environment (optionally with a
 required reviewer, which turns `deploy.yml` into a one-click approval gate).
 
 ### Deploy from scratch
@@ -263,7 +264,7 @@ not infrastructure, so I left it and am flagging it.
 | Edge protection | WAF: AWS Common, Known Bad Inputs, IP Reputation managed rule groups, plus a 2000 req/5 min per-IP rate limit. ALB drops invalid headers. Only GET is implemented; everything else is 405. |
 | Supply chain | Immutable ECR tags, scan-on-push, image tag = git sha, Trivy gate in CI (fails on fixable HIGH/CRITICAL), `npm ci` from the lockfile, pinned action/provider/module versions. |
 | Audit logging | EKS control-plane logs (`api`, `audit`, `authenticator`, `controllerManager`, `scheduler`) to CloudWatch, 30-day retention. VPC flow logs. ALB access logs to S3 with 90-day lifecycle. WAF sampled requests + CloudWatch metrics. Terraform state is versioned, so every infrastructure change has a before/after. |
-| Runtime hardening | Non-root UID 1000, `readOnlyRootFilesystem`, all capabilities dropped, `seccompProfile: RuntimeDefault`, no privilege escalation, memory limits. |
+| Runtime hardening | Non-root UID 1000, `readOnlyRootFilesystem`, all capabilities dropped, `seccompProfile: RuntimeDefault`, no privilege escalation, memory limits. The `api` namespace enforces the `restricted` Pod Security profile; `monitoring` only warns, because node-exporter needs host network and PID access. |
 
 ### Control mapping (evidence this setup would produce)
 
