@@ -204,7 +204,10 @@ branch. Two layers do the blocking: a WAF rule that lowercases and normalises
 the path and rejects anything starting with `/metrics` (so `/Metrics` and
 `/metrics/` are caught too), and an ALB fixed-response rule on `/metrics*` as
 a backstop. The deploy smoke test checks four spellings. Prometheus scrapes
-the pod directly inside the VPC and never crosses the ALB.
+the pod directly inside the VPC and never crosses the ALB. One thing I
+learned deploying it: the ALB controller orders listener rules by path type,
+and an `ImplementationSpecific` wildcard landed behind the `/` catch-all, so
+the backstop rule is a `Prefix` on `/metrics` instead.
 
 Cluster authentication uses access entries (`authentication_mode = "API"`)
 instead of the legacy `aws-auth` ConfigMap, so every grant of cluster access
@@ -353,7 +356,19 @@ In the order I would tackle them.
 
 ## Live URL
 
-The URL is an output of the platform stack and the deploy workflow prints it.
-I include it in the submission email while the environment is up. Between
-sessions I tear the environment down to keep the bill near zero; `make deploy`
-brings it back in about 25 minutes.
+http://k8s-monoapiprod-f1ecaa2ed8-303706735.us-east-1.elb.amazonaws.com
+
+```bash
+curl http://k8s-monoapiprod-f1ecaa2ed8-303706735.us-east-1.elb.amazonaws.com/health
+curl "http://k8s-monoapiprod-f1ecaa2ed8-303706735.us-east-1.elb.amazonaws.com/getAccount?id=66ab443c4d4ac0b1cdf456911"
+curl -i http://k8s-monoapiprod-f1ecaa2ed8-303706735.us-east-1.elb.amazonaws.com/metrics   # 403
+```
+
+Plain HTTP on the ALB hostname because no domain was available; the HTTPS
+path is wired and described above. The URL is an output of the platform stack
+and the deploy workflow prints it on every run. If the environment has been
+torn down to save cost by the time you read this, `make deploy` brings it back
+in about 25 minutes with a new hostname.
+
+Grafana is not exposed. `make grafana` port-forwards it to
+http://localhost:3001; the dashboard is "Mono API - RED".

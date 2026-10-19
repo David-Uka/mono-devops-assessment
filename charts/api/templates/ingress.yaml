@@ -24,9 +24,11 @@ spec:
       http:
         paths:
 {{- if $.Values.ingress.denyMetricsAtEdge }}
-          # Handled by the ALB itself (fixed 403) via the actions.metrics-deny annotation
-          - path: /metrics*
-            pathType: ImplementationSpecific
+          # Handled by the ALB itself (fixed 403) via the actions.metrics-deny
+          # annotation. Prefix type matters: the controller orders longer
+          # prefixes ahead of "/", so this rule fires before the catch-all.
+          - path: /metrics
+            pathType: Prefix
             backend:
               service:
                 name: metrics-deny
@@ -45,9 +47,11 @@ spec:
     - http:
         paths:
 {{- if $.Values.ingress.denyMetricsAtEdge }}
-          # Handled by the ALB itself (fixed 403) via the actions.metrics-deny annotation
-          - path: /metrics*
-            pathType: ImplementationSpecific
+          # Handled by the ALB itself (fixed 403) via the actions.metrics-deny
+          # annotation. Prefix type matters: the controller orders longer
+          # prefixes ahead of "/", so this rule fires before the catch-all.
+          - path: /metrics
+            pathType: Prefix
             backend:
               service:
                 name: metrics-deny
