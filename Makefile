@@ -5,6 +5,7 @@ REGION ?= us-east-1
 STATE_BUCKET ?= $(shell cd terraform/bootstrap 2>/dev/null && terraform output -raw state_bucket 2>/dev/null)
 IMAGE_TAG ?= $(shell git rev-parse --short=12 HEAD)-local-$(shell date +%s)
 GITHUB_REPO ?= $(shell gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null)
+GITHUB_IDS  ?= $(shell gh api repos/$(GITHUB_REPO) --jq '"-var github_owner_id=\(.owner.id) -var github_repo_id=\(.id)"' 2>/dev/null)
 
 .PHONY: help build run test bootstrap infra platform deploy destroy kubeconfig grafana
 
@@ -23,7 +24,7 @@ test: ## typecheck, helm lint, terraform validate
 	for s in bootstrap infra platform; do (cd terraform/$$s && terraform init -backend=false -input=false >/dev/null && terraform validate); done
 
 bootstrap: ## one-time: state bucket + GitHub OIDC roles (local state)
-	cd terraform/bootstrap && terraform init -input=false && terraform apply -var "github_repo=$(GITHUB_REPO)"
+	cd terraform/bootstrap && terraform init -input=false && terraform apply -var "github_repo=$(GITHUB_REPO)" $(GITHUB_IDS)
 
 infra: ## VPC, EKS, ECR, WAF
 	cd terraform/infra && terraform init -input=false -backend-config="bucket=$(STATE_BUCKET)" && terraform apply

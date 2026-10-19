@@ -93,6 +93,11 @@ make bootstrap GITHUB_REPO=<owner>/<repo>
 # note the three outputs
 ```
 
+The Makefile also looks up the numeric owner and repo IDs with `gh` and
+passes them in. GitHub now issues OIDC subjects of the form
+`repo:owner@<id>/name@<id>:...` on repos with immutable subjects enabled,
+and the trust policy accepts both that and the plain `repo:owner/name` form.
+
 Then in the GitHub repo set **variables** `AWS_DEPLOY_ROLE_ARN`,
 `AWS_PLAN_ROLE_ARN`, `TF_STATE_BUCKET` (from the outputs) and optionally
 `API_DOMAIN_NAME`, `ROUTE53_ZONE_ID`; and the **secret**

@@ -86,9 +86,22 @@ resource "aws_iam_openid_connect_provider" "github" {
   thumbprint_list = [data.tls_certificate.github.certificates[0].sha1_fingerprint]
 }
 
+# GitHub can issue "immutable" subject claims that embed the owner and repo
+# IDs (repo:owner@<id>/name@<id>:...), which survive renames and cannot be
+# hijacked by re-creating a deleted repo. Trust both spellings so the roles
+# work whichever mode the repo is in; look the IDs up with
+#   gh api repos/<owner>/<name> --jq '"\(.owner.id) \(.id)"'
 locals {
-  oidc_sub_main = "repo:${var.github_repo}:ref:refs/heads/${var.default_branch}"
-  oidc_sub_pr   = "repo:${var.github_repo}:pull_request"
+  repo_owner = split("/", var.github_repo)[0]
+  repo_name  = split("/", var.github_repo)[1]
+  sub_prefixes = compact([
+    "repo:${var.github_repo}",
+    var.github_owner_id != null && var.github_repo_id != null
+    ? "repo:${local.repo_owner}@${var.github_owner_id}/${local.repo_name}@${var.github_repo_id}"
+    : "",
+  ])
+  oidc_sub_main = [for p in local.sub_prefixes : "${p}:ref:refs/heads/${var.default_branch}"]
+  oidc_sub_pr   = [for p in local.sub_prefixes : "${p}:pull_request"]
 }
 
 # Role used by `terraform plan` on pull requests: read-only plus state access.
@@ -107,7 +120,7 @@ data "aws_iam_policy_document" "gha_plan_trust" {
     condition {
       test     = "StringLike"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = [local.oidc_sub_pr, local.oidc_sub_main]
+      values   = concat(local.oidc_sub_pr, local.oidc_sub_main)
     }
   }
 }
@@ -128,7 +141,7 @@ data "aws_iam_policy_document" "gha_deploy_trust" {
     condition {
       test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = [local.oidc_sub_main]
+      values   = local.oidc_sub_main
     }
   }
 }
