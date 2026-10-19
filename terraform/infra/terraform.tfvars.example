@@ -1,0 +1,11 @@
+# Copy to terraform.tfvars and edit. All values have sane defaults in variables.tf.
+region             = "us-east-1"
+kubernetes_version = "1.36"
+single_nat_gateway = true
+
+# Lock the EKS API endpoint down to where terraform / kubectl run from.
+# endpoint_public_access_cidrs = ["203.0.113.10/32"]
+
+# Optional real hostname + ACM cert (needs a Route53 zone you own)
+# domain_name     = "api.example.com"
+# route53_zone_id = "Z0123456789ABCDEFGHIJ"

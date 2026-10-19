@@ -1,0 +1,50 @@
+name: Destroy
+
+# Manual, guarded teardown. Type the cluster name to confirm.
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "mono-api-prod" to confirm destruction'
+        required: true
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: us-east-1
+  TF_VERSION: "1.16.1"
+
+jobs:
+  destroy:
+    if: inputs.confirm == 'mono-api-prod'
+    runs-on: ubuntu-latest
+    environment: prod
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+      - uses: azure/setup-helm@v4
+      - name: Destroy platform (releases the ALB before the VPC goes)
+        working-directory: terraform/platform
+        run: |
+          terraform init -input=false -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}"
+          terraform destroy -input=false -auto-approve
+        env:
+          TF_VAR_image_tag: destroy
+      - name: Destroy infra
+        working-directory: terraform/infra
+        run: |
+          terraform init -input=false -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}"
+          terraform destroy -input=false -auto-approve

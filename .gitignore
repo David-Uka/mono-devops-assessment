@@ -3,3 +3,14 @@ node_modules/
 *.log
 .DS_Store
 dist
+# Terraform
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+tfplan
+crash.log
+*.auto.tfvars
+terraform.tfvars
+!*.tfvars.example
+.terraform.lock.hcl

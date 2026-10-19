@@ -9,8 +9,12 @@ export class RequestMetricsMiddleware implements ExpressMiddlewareInterface {
   constructor(private readonly metrics: MetricsService) {}
 
   use(req: Request, res: Response, next: NextFunction): void {
+    const startedAt = process.hrtime.bigint();
+    this.metrics.requestStarted();
+
     res.on("finish", () => {
-      this.metrics.countRequest(req.method ?? "UNKNOWN", req.path, res.statusCode);
+      const elapsedSeconds = Number(process.hrtime.bigint() - startedAt) / 1e9;
+      this.metrics.requestFinished(req.method ?? "UNKNOWN", req.path, res.statusCode, elapsedSeconds);
     });
     next();
   }

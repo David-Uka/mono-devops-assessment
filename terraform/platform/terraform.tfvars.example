@@ -1,0 +1,4 @@
+image_tag = "local"              # CI passes the git sha
+# domain_name         = "api.example.com"
+# acm_certificate_arn = "arn:aws:acm:us-east-1:123456789012:certificate/..."
+# grafana_admin_password = "change-me"

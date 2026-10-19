@@ -1,0 +1,108 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches-ignore: [main]
+
+permissions:
+  contents: read
+  id-token: write   # OIDC for the read-only plan role
+  pull-requests: write
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  AWS_REGION: us-east-1
+
+jobs:
+  app:
+    name: Typecheck, build, image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
+      - name: Build image (not pushed)
+        run: docker build -t api:ci .
+      - name: Scan image for vulnerabilities
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: api:ci
+          format: table
+          exit-code: "1"
+          ignore-unfixed: true
+          severity: CRITICAL,HIGH
+      - name: Smoke test container
+        run: |
+          docker run -d --rm --name api -p 3000:3000 api:ci
+          for i in $(seq 1 20); do curl -fs localhost:3000/health && break; sleep 1; done
+          curl -fs localhost:3000/getAccount >/dev/null
+          curl -fs localhost:3000/metrics | grep -q http_request_duration_seconds
+          docker stop api
+
+  helm:
+    name: Helm lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+      - run: helm lint charts/api --set image.repository=x --set image.tag=y
+      - run: helm template api charts/api --set image.repository=x --set image.tag=y --set ingress.enabled=true --set ingress.denyMetricsAtEdge=true >/dev/null
+
+  terraform:
+    name: Terraform ${{ matrix.stack }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        stack: [bootstrap, infra, platform]
+    defaults:
+      run:
+        working-directory: terraform/${{ matrix.stack }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.16.1"
+      - run: terraform fmt -check -recursive -diff
+      - run: terraform init -backend=false -input=false
+      - run: terraform validate -no-color
+
+  plan:
+    name: Plan infra (PR only)
+    if: github.event_name == 'pull_request' && vars.AWS_PLAN_ROLE_ARN != ''
+    needs: [terraform]
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: terraform/infra
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_PLAN_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.16.1"
+      - run: terraform init -input=false -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}"
+      - id: plan
+        run: terraform plan -no-color -input=false -lock=false -out=tfplan 2>&1 | tail -80 > plan.txt; cat plan.txt
+      - name: Comment plan on PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const plan = fs.readFileSync('terraform/infra/plan.txt', 'utf8');
+            await github.rest.issues.createComment({
+              ...context.repo, issue_number: context.issue.number,
+              body: '### Terraform plan (infra)\n```\n' + plan + '\n```'
+            });
