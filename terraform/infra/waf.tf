@@ -8,6 +8,14 @@ resource "aws_wafv2_web_acl" "api" {
     allow {}
   }
 
+  # Body returned by every block action below, so a browser or curl gets a
+  # readable JSON error instead of an empty page.
+  custom_response_body {
+    key          = "forbidden"
+    content_type = "APPLICATION_JSON"
+    content      = jsonencode({ error = "forbidden", message = "This path is not available from the public internet." })
+  }
+
   # Belt and braces with the ALB fixed-response rule: this one is
   # case-insensitive and path-normalised, so /Metrics and /metrics/ are caught.
   rule {
@@ -16,7 +24,8 @@ resource "aws_wafv2_web_acl" "api" {
     action {
       block {
         custom_response {
-          response_code = 403
+          response_code            = 403
+          custom_response_body_key = "forbidden"
         }
       }
     }
@@ -109,7 +118,12 @@ resource "aws_wafv2_web_acl" "api" {
     name     = "rate-limit-per-ip"
     priority = 40
     action {
-      block {}
+      block {
+        custom_response {
+          response_code            = 429
+          custom_response_body_key = "forbidden"
+        }
+      }
     }
     statement {
       rate_based_statement {
