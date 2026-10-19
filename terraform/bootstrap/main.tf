@@ -230,6 +230,13 @@ data "aws_iam_policy_document" "gha_deploy_iam" {
     actions   = ["iam:GetOpenIDConnectProvider", "iam:CreateOpenIDConnectProvider", "iam:DeleteOpenIDConnectProvider", "iam:TagOpenIDConnectProvider", "iam:CreateServiceLinkedRole", "iam:ListPolicies", "iam:ListRoles"]
     resources = ["*"]
   }
+  statement {
+    # EKS, Auto Scaling and ELB check for their service-linked roles before
+    # creating resources; that lookup needs GetRole on the SLR path.
+    sid       = "ReadServiceLinkedRoles"
+    actions   = ["iam:GetRole", "iam:ListAttachedRolePolicies"]
+    resources = ["arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/aws-service-role/*"]
+  }
 }
 
 resource "aws_iam_policy" "gha_deploy_iam" {
