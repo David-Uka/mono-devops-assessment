@@ -26,6 +26,12 @@ variable "github_repo_id" {
   default     = null
 }
 
+variable "deploy_environment" {
+  description = "GitHub environment the deploy job runs under"
+  type        = string
+  default     = "prod"
+}
+
 variable "default_branch" {
   type    = string
   default = "main"
