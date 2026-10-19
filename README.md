@@ -21,6 +21,7 @@ You have been provided with a simple web service that serves 4 endpoints, you ar
 1. collect `/metrics` with Prometheus (or Grafana Alloy)
 2. A plan for upgrading the EKS cluster version with no downtime
 3. extend the metric collected and build a reasonable a Grafana dashboard for request rate, error rate and latency, and commit it as JSON
+4. A live URL that accessible with the necessary security measures in place for a production public API
 
 ## Submission
 
