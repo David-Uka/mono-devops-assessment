@@ -50,3 +50,5 @@ jobs:
         run: |
           terraform init -input=false -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}"
           terraform destroy -input=false -auto-approve
+        env:
+          TF_VAR_additional_cluster_admin_arns: ${{ vars.CLUSTER_ADMIN_ARNS || '[]' }}

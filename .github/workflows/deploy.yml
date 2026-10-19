@@ -47,6 +47,8 @@ jobs:
         env:
           TF_VAR_domain_name: ${{ vars.API_DOMAIN_NAME }}
           TF_VAR_route53_zone_id: ${{ vars.ROUTE53_ZONE_ID }}
+          # JSON list of IAM ARNs that get cluster-admin besides the CI role
+          TF_VAR_additional_cluster_admin_arns: ${{ vars.CLUSTER_ADMIN_ARNS || '[]' }}
       - id: out
         run: |
           echo "cluster_name=$(terraform output -raw cluster_name)" >> "$GITHUB_OUTPUT"
