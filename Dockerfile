@@ -27,6 +27,10 @@ ENV NODE_ENV=production \
     PORT=3000
 WORKDIR /app
 
+# npm is a build-time tool. Dropping it from the runtime image removes its
+# bundled dependencies (undici, brace-expansion, ...) from the attack surface.
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack
+
 # Drop to the unprivileged `node` user that ships with the official image
 COPY --chown=node:node --from=deps  /app/node_modules ./node_modules
 COPY --chown=node:node --from=build /app/dist         ./dist
