@@ -316,31 +316,28 @@ In the order I would address them.
 
 ## How AI was used
 
-I used Claude as a coding and debugging assistant.
+I used AI as a coding and debugging assistant.
 
-**Design.** The architecture and the trade-offs in this document are my
-decisions.
+It produced first drafts of the multi-stage Dockerfile, the Helm chart, the
+three Terraform stacks, the GitHub Actions workflows and the Grafana
+dashboard JSON from written specifications for each piece. It also looked
+up current versions of the EKS module, providers and charts so the version
+pins were correct.
 
-**Drafting.** Claude wrote the first versions of the multi-stage Dockerfile,
-the Helm chart, the three Terraform stacks, the GitHub Actions workflows and
-the Grafana dashboard JSON. It also looked up current versions of the EKS
-module, providers and charts so the pins were accurate.
+Every draft was reviewed and corrected before use. The first chart lost
+`.Values` scope inside a `range`, a module argument had the wrong name, the
+ALB controller chart pin was a major version behind, and the Kubernetes 3.x
+provider needed `exec` as a block.
 
-**Review.** I read through the drafts and corrected them. The first chart
-lost `.Values` scope inside a `range`, a module argument had the wrong name,
-the ALB controller chart pin was a major version behind, and the Kubernetes
-3.x provider needed `exec` as a block.
+It ran the local checks on request: typecheck, helm lint and template,
+terraform validate and the container smoke tests.
 
-**Local checks.** Claude ran typecheck, helm lint and template, terraform
-validate and the container smoke tests when I asked.
-
-**Debugging.** Deploying against the real account broke in several places.
-For each one I gave Claude the error and the context, we narrowed down the
-cause, and I applied and tested the fix. The issues were GitHub's immutable
-OIDC subject claims, the environment subject on the deploy job, a
-service-linked-role lookup the deploy role couldn't make, node-exporter
-under the baseline Pod Security profile, and the ALB controller's rule
-ordering.
+During deployment against the real AWS account it was used to narrow down
+failures from the error output and context. The issues found this way were
+GitHub's immutable OIDC subject claims, the environment subject on the
+deploy job, a service-linked-role lookup the deploy role could not make,
+node-exporter under the baseline Pod Security profile, and the ALB
+controller's rule ordering.
 
 ## Live URL
 
