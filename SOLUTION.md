@@ -94,7 +94,8 @@ Then in the GitHub repo:
 * Variables: `AWS_DEPLOY_ROLE_ARN`, `AWS_PLAN_ROLE_ARN`, `TF_STATE_BUCKET`
   (the bootstrap outputs); `CLUSTER_ADMIN_ARNS` (JSON list of IAM ARNs that
   get `kubectl` access, since CI creates the cluster); optionally
-  `API_DOMAIN_NAME` and `ROUTE53_ZONE_ID`.
+  `AWS_REGION` (default `us-east-1`), `API_DOMAIN_NAME` and
+  `ROUTE53_ZONE_ID`.
 * Secret `GRAFANA_ADMIN_PASSWORD`, optional. Without it the chart generates
   one and `make grafana` prints it.
 * A `prod` environment, restricted to the `main` branch. Adding a required
@@ -309,7 +310,8 @@ In the order I would address them.
    deletion protection, `force_delete = false` on ECR, `prevent_destroy` on
    the state bucket.
 9. Committed provider lock files with hashes for both Linux and macOS
-   (`terraform providers lock -platform=...`).
+   (`terraform providers lock -platform=...`), and GitHub Actions pinned to
+   commit SHAs with Dependabot keeping them current.
 10. Incident, rollback and key-rotation runbooks alongside the upgrade one.
 
 ## Live URL
