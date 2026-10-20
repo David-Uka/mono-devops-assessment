@@ -17,11 +17,12 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  AWS_REGION: us-east-1
+  AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
   TF_VERSION: "1.16.1"
 
 jobs:
   destroy:
+    name: Destroy platform, then infra
     if: inputs.confirm == 'mono-api-prod'
     runs-on: ubuntu-latest
     environment: prod
@@ -35,13 +36,14 @@ jobs:
         with:
           terraform_version: ${{ env.TF_VERSION }}
           terraform_wrapper: false
-      - uses: azure/setup-helm@v4
       - name: Destroy platform (releases the ALB before the VPC goes)
         working-directory: terraform/platform
         run: |
           terraform init -input=false -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}"
           terraform destroy -input=false -auto-approve
         env:
+          TF_VAR_region: ${{ env.AWS_REGION }}
+          # image_tag is required by the stack but unused on destroy
           TF_VAR_image_tag: destroy
           TF_VAR_domain_name: ${{ vars.API_DOMAIN_NAME }}
           TF_VAR_route53_zone_id: ${{ vars.ROUTE53_ZONE_ID }}
@@ -51,4 +53,5 @@ jobs:
           terraform init -input=false -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}"
           terraform destroy -input=false -auto-approve
         env:
+          TF_VAR_region: ${{ env.AWS_REGION }}
           TF_VAR_additional_cluster_admin_arns: ${{ vars.CLUSTER_ADMIN_ARNS || '[]' }}
