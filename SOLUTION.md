@@ -13,7 +13,7 @@ and deployed from GitHub Actions on every push to `main`.
 | 6. Public, secure, available | ALB and WAF, private nodes, HPA and PDB, two AZs |
 | Bonus 1. Prometheus scrapes `/metrics` | `terraform/platform/monitoring.tf`, `ServiceMonitor` in the chart |
 | Bonus 2. Zero-downtime upgrade plan | `docs/eks-upgrade-plan.md` |
-| Bonus 3. Extended metrics and Grafana dashboard | `src/services/metrics.service.ts`, `dashboards/api-red.json` |
+| Bonus 3. Extended metrics and Grafana dashboard | `src/services/metrics.service.ts`, `dashboards/api-red.json` ([screenshot](docs/images/grafana-dashboard.png)) |
 | Bonus 4. Live URL | last section |
 
 ## Architecture
@@ -330,4 +330,7 @@ If the environment has been torn down by the time you read this,
 `make deploy` brings it back in about 25 minutes with a new hostname.
 
 Grafana is not exposed. `make grafana` prints the admin password and
-port-forwards it to http://localhost:3001.
+port-forwards it to http://localhost:3001. The dashboard as it looked with
+live traffic:
+
+![Mono API RED dashboard](docs/images/grafana-dashboard.png)
