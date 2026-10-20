@@ -314,6 +314,34 @@ In the order I would address them.
    commit SHAs with Dependabot keeping them current.
 10. Incident, rollback and key-rotation runbooks alongside the upgrade one.
 
+## How AI was used
+
+I used Claude as a coding and debugging assistant.
+
+**Design.** The architecture and the trade-offs in this document are my
+decisions.
+
+**Drafting.** Claude wrote the first versions of the multi-stage Dockerfile,
+the Helm chart, the three Terraform stacks, the GitHub Actions workflows and
+the Grafana dashboard JSON. It also looked up current versions of the EKS
+module, providers and charts so the pins were accurate.
+
+**Review.** I read through the drafts and corrected them. The first chart
+lost `.Values` scope inside a `range`, a module argument had the wrong name,
+the ALB controller chart pin was a major version behind, and the Kubernetes
+3.x provider needed `exec` as a block.
+
+**Local checks.** Claude ran typecheck, helm lint and template, terraform
+validate and the container smoke tests when I asked.
+
+**Debugging.** Deploying against the real account broke in several places.
+For each one I gave Claude the error and the context, we narrowed down the
+cause, and I applied and tested the fix. The issues were GitHub's immutable
+OIDC subject claims, the environment subject on the deploy job, a
+service-linked-role lookup the deploy role couldn't make, node-exporter
+under the baseline Pod Security profile, and the ALB controller's rule
+ordering.
+
 ## Live URL
 
 http://k8s-monoapiprod-f1ecaa2ed8-303706735.us-east-1.elb.amazonaws.com
