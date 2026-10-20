@@ -341,12 +341,12 @@ controller's rule ordering.
 
 ## Live URL
 
-http://k8s-monoapiprod-f1ecaa2ed8-303706735.us-east-1.elb.amazonaws.com
+http://k8s-monoapiprod-f1ecaa2ed8-1922037777.us-east-1.elb.amazonaws.com
 
 ```bash
-curl http://k8s-monoapiprod-f1ecaa2ed8-303706735.us-east-1.elb.amazonaws.com/health
-curl "http://k8s-monoapiprod-f1ecaa2ed8-303706735.us-east-1.elb.amazonaws.com/getAccount?id=66ab443c4d4ac0b1cdf456911"
-curl -i http://k8s-monoapiprod-f1ecaa2ed8-303706735.us-east-1.elb.amazonaws.com/metrics   # 403
+curl http://k8s-monoapiprod-f1ecaa2ed8-1922037777.us-east-1.elb.amazonaws.com/health
+curl "http://k8s-monoapiprod-f1ecaa2ed8-1922037777.us-east-1.elb.amazonaws.com/getAccount?id=66ab443c4d4ac0b1cdf456911"
+curl -i http://k8s-monoapiprod-f1ecaa2ed8-1922037777.us-east-1.elb.amazonaws.com/metrics   # 403
 ```
 
 Plain HTTP on the ALB hostname because no domain was available. The URL is an
