@@ -20,7 +20,7 @@ and deployed from GitHub Actions on every push to `main`.
 
 ![Architecture](docs/images/architecture.png)
 
-Editable source: `docs/architecture.drawio` (open at app.diagrams.net).
+Source: `docs/architecture.drawio`.
 
 A request passes through WAF, then the ALB, then straight to a pod IP
 (`target-type: ip`, no NodePort hop) and into Express on port 3000. TLS
