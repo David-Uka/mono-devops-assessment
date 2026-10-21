@@ -18,40 +18,9 @@ and deployed from GitHub Actions on every push to `main`.
 
 ## Architecture
 
-```
-                         Internet
-                            │
-                   ┌────────▼────────┐
-                   │   AWS WAF v2    │  managed rules, rate limit, /metrics block
-                   └────────┬────────┘
-                            │
-                   ┌────────▼────────┐   public subnets, 2 AZs
-                   │       ALB       │   access logs to S3
-                   │  /metrics -> 403│   fixed-response rule
-                   └────────┬────────┘
-   ┌────────────────────────┼─────────────────────────────┐  VPC 10.40.0.0/16
-   │  private subnets, 2 AZs│  (no public IPs on nodes)   │
-   │   ┌────────────────────▼───────────────────────┐     │
-   │   │ EKS 1.36  (managed node group, t3.medium)  │     │
-   │   │                                            │     │
-   │   │  ns api (PSA: restricted)                  │     │
-   │   │   Deployment api  x2..6 (HPA)  ◄── PDB     │     │
-   │   │   NetworkPolicy, non-root, ro-rootfs       │     │
-   │   │                                            │     │
-   │   │  ns monitoring                             │     │
-   │   │   Prometheus ──scrape /metrics──► api pods │     │
-   │   │   Grafana (ClusterIP, RED dashboard)       │     │
-   │   │                                            │     │
-   │   │  kube-system: ALB controller (IRSA),       │     │
-   │   │   coredns, vpc-cni, metrics-server         │     │
-   │   └────────────────────────────────────────────┘     │
-   │          │ NAT GW (egress only)      VPC flow logs ──► CloudWatch
-   └──────────┼──────────────────────────────────────────┘
-              ▼
-     ECR (KMS, immutable tags, scan on push)   CloudWatch (control-plane audit logs)
+![Architecture](docs/images/architecture.png)
 
-   GitHub Actions ──OIDC──► IAM role (no static keys) ──► terraform apply
-```
+Editable source: `docs/architecture.drawio` (open at app.diagrams.net).
 
 A request passes through WAF, then the ALB, then straight to a pod IP
 (`target-type: ip`, no NodePort hop) and into Express on port 3000. TLS
